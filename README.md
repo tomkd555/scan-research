@@ -1,52 +1,56 @@
 # scan-research
 
-A light research skill for Claude Code. It scans a topic in one pass and returns a single sourced
-Markdown report: three to five sub-questions, up to three collection agents in parallel, and a
-report whose every claim carries a full URL, a publication date and a source grade.
+A Claude Code plugin for light web research.
 
-It buys coverage and sourcing, and deliberately does not buy verification. There is no evidence
-ledger, no matching of quotes against the live page, no verifier agents and no audit gate — a
-six-line checklist stands in their place. No Python, no JSON schema.
+It splits a topic into three to five sub-questions and runs up to three collection agents in
+parallel. The result is one Markdown report, and every claim in that report carries a full URL, a
+publication date and a source grade.
 
-## Where it sits
+There is no verification stage: no evidence ledger, no matching of quotes against the live page,
+no verifier agents, no audit gate. A six-line checklist replaces them. The plugin ships as
+Markdown only, with no Python and no JSON schema.
 
-| Request | Where it goes |
+## When to use it
+
+| Your request | Use |
 |---|---|
-| A single fact one search settles | Plain WebSearch; no skill needed |
-| Coverage of a subject, with sources, for a decision you can revisit | **scan-research** |
-| Money, an external publication, a management decision, or a contested subject | [research-team](https://github.com/tomkd555/research-skill) |
-| A literature review with no web side | literature-review (ships with research-team) |
+| A single fact that one search settles | Plain WebSearch. No skill needed |
+| An overview of a topic, with its sources, for a decision you can revisit | **scan-research** |
+| High stakes: a budget, an external publication, a management decision, or a subject the sources disagree about | [research-team](https://github.com/tomkd555/research-skill) |
+| A literature review with no web component | literature-review, which ships with research-team |
 
-A scan that runs into conflicting sources on the figure its answer turns on, or past roughly 60
-searches, stops and hands over to research-team rather than deepening on its own.
+scan-research stops and hands the job to research-team when the sources conflict on the figure the
+answer depends on, or when the run passes about 60 searches.
 
-Web-first. Academic sources come in only where a sub-question turns on effectiveness, causality or
-a comparison of methods, and are cited by DOI.
-
-## Contents
-
-```
-plugins/scan-research/
-  agents/scan-collector.md          the collection agent, one per sub-question
-  skills/scan-research/SKILL.md     the procedure, the floors, the evidence standards
-```
+The agents search the general web. They reach for academic sources only where a sub-question is
+about effectiveness, causality or a comparison of methods, and they cite those by DOI.
 
 ## Install
 
 ```
-/plugin marketplace add <path to this repository>
+/plugin marketplace add https://github.com/tomkd555/scan-research
 /plugin install scan-research@tomkd555
 ```
 
+Then ask for a scan in either language: 「ざっと調べて」「一通り調べて」「概況をまとめて」,
+"give me a scan of", "brief me on".
+
 ## Output
 
-`research/{YYYYMMDD}-{topic-slug}/`
+Everything lands in `research/{YYYYMMDD}-{topic-slug}/`.
 
-| File | Written by |
+| File | Written by | Contents |
+|---|---|---|
+| `evidence/{sub-question-slug}.md` | Each collection agent | Its source table, search log and gaps |
+| `report.md` | The main session | Answer, findings per sub-question, where sources disagree, source table, what was left out |
+
+## Contents
+
+| Path | What it holds |
 |---|---|
-| `evidence/{sub-question-slug}.md` | Each collection agent — its source table, search log and gaps |
-| `report.md` | The main session — answer, per-sub-question findings, where sources disagree, sources, what was not covered |
+| `plugins/scan-research/skills/scan-research/SKILL.md` | The procedure, the collection floors, the evidence standards |
+| `plugins/scan-research/agents/scan-collector.md` | The collection agent, one per sub-question, running on Sonnet |
 
-## Licence
+## License
 
 MIT
