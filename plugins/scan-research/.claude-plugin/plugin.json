@@ -1,0 +1,20 @@
+{
+  "name": "scan-research",
+  "displayName": "Scan Research",
+  "version": "1.0.0",
+  "description": "Scans a topic in one pass: three to five sub-questions, up to three collection agents in parallel, and a single Markdown report whose every claim carries a URL, a date and a source grade.",
+  "author": {
+    "name": "tomkd555",
+    "url": "https://github.com/tomkd555"
+  },
+  "homepage": "https://github.com/tomkd555/scan-research",
+  "repository": "https://github.com/tomkd555/scan-research",
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "web-research",
+    "evidence",
+    "sourcing",
+    "lightweight"
+  ]
+}
