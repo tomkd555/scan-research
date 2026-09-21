@@ -10,7 +10,7 @@
       "name": "scan-research",
       "source": "./plugins/scan-research",
       "description": "Scans a topic in one pass: three to five sub-questions, up to three collection agents in parallel, and a single Markdown report whose every claim carries a URL, a date and a source grade.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "tomkd555",
         "url": "https://github.com/tomkd555"
