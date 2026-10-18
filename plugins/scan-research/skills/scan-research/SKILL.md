@@ -21,6 +21,7 @@ allowed-tools:
 - WebFetch
 - Read
 - Write
+- Edit
 - Glob
 - Grep
 - AskUserQuestion
@@ -31,8 +32,9 @@ allowed-tools:
 
 A scan is the step between one search and a research-team run. It provides coverage, sourcing
 and one round of doubt. Its safeguards are a floor on collection, a grade on every source, a
-quote from the page on every key figure, and a re-fetch of the three key figures that matter most. The
-evidence ledger, script-matched quotes, verifier agents and audit gate belong to research-team.
+quote from the page on every key figure, and a re-fetch of up to three key figures, the ones the
+Answer depends on most. The evidence ledger, script-matched quotes, verifier agents and audit gate
+belong to research-team.
 
 Run the whole thing in the main session. The only delegation is collection. Pause for the user
 only at the two points this skill names: the scope question in Step 1 and the hand-over to
@@ -85,8 +87,9 @@ Create the output directory `research/{YYYYMMDD}-{topic-slug}/` unless the user 
 ## Step 2 Collect
 
 Launch one `scan-collector` per sub-question, at most three, in one message. Where there are four
-or five sub-questions, take the remainder yourself: run the collector's procedure under the same
-floors and write the same evidence file for each, so Step 3 reads every sub-question the same way.
+or five sub-questions, take the remainder yourself. Read the collector's procedure in
+`../../agents/scan-collector.md`, relative to this skill's base directory, and run it under the
+same floors. Write the same evidence file for each, so Step 3 reads every sub-question the same way.
 A second wave of collectors would add more wall-clock time than it saves. Tell the user in one line
 which sub-questions are being collected. The collectors run in the background; collect the
 remainder while they run.
@@ -123,9 +126,9 @@ regulator's or the company's own domain). The argument takes a list of domains i
 of methods, spend one of its queries on scholarly sources and cite the paper by DOI. A request
 whose whole weight is academic belongs to literature-review.
 
-**Budget.** Roughly 25 to 45 WebSearch calls for the scan. A collector runs its four-search floor
-plus what the falsifier and its gaps need, and stops once two queries in a row return only
-sources it already has. The cap is Claude Code's 200 searches per session, shared by the parent
+**Budget.** Roughly 25 to 45 WebSearch calls for the scan. A collector runs its four-search floor,
+which includes the falsifier, plus what its gaps need. It stops once two queries in a row return
+only sources it already has. The cap is Claude Code's 200 searches per session, shared by the parent
 and every subagent. Passing 60 means the request outgrew this skill. Say so and offer
 research-team.
 
@@ -177,8 +180,8 @@ definition, period or population. Omit the section where they agree.
 
 ## Re-fetch
 | Figure | URL | Words returned | Outcome |
-(the three key figures the Answer depends on; outcome is confirmed, dropped, contradicted or
-unreadable)
+(up to three key figures, the ones the Answer depends on most; outcome is confirmed, dropped,
+contradicted or unreadable)
 
 ## Not covered
 What this scan left out, what could not be confirmed, and what a research-team run would add.
@@ -187,10 +190,10 @@ of informed opinion.
 ```
 
 Write every claim in the Answer and Findings from the evidence files, including points you
-believe you already know. A point that only your own knowledge supports goes to "Not covered". Findings state each
-claim in your own words with its `[S#]`. A page's own wording appears only in the Quote column,
-or in quotation marks beside its `[S#]`, so the reader can tell the source's words from the
-summary:
+believe you already know. A point that only your own knowledge supports goes to "Not covered".
+Findings state each claim in your own words with its `[S#]`. A page's own wording appears only in
+the Quote column, or in quotation marks beside its `[S#]`, so the reader can tell the source's
+words from the summary:
 
 <example>
 Findings line: Public chargers in the region grew by about a quarter in 2024 [S3], and the
@@ -247,9 +250,11 @@ Do not fetch a page the search snippet already shows to be a content farm.
 
 ## Step 5 Re-fetch
 
-The quotes came from the collectors' reads; this step tests the quotes of the three key figures
-the Answer most depends on against the page itself. Fetch the three pages again with WebFetch in one message, asking each to
-return only the words around the figure, 125 characters at most. WebFetch serves its own copy
+The quotes came from the collectors' reads. This step tests the quotes of the three key figures
+the Answer depends on most against the page itself. Where the Answer rests on fewer than three
+key figures, re-fetch each one it has; where it rests on none, write `none` in the Re-fetch table.
+Fetch the pages again with WebFetch in one message, asking each to return only the words around
+the figure, 125 characters at most. WebFetch serves its own copy
 of a URL fetched within the last fifteen minutes, so append a harmless query string (`?recheck=1`)
 to get a fresh read. For a figure from a user-supplied file, Grep the quoted words in the file.
 
@@ -260,8 +265,8 @@ to get a fresh read. For a figure from a user-supplied file, Grep the quoted wor
 - `unreadable`: the page loads, but WebFetch returns garbled text, as it does for some Shift_JIS
   pages. The figure stays, and the body says the re-fetch could not confirm it.
 
-Edit the report in place: fill the Re-fetch table with the three outcomes and move any dropped
-figure out of the Answer.
+Edit the report in place: fill the Re-fetch table with the outcomes and move any dropped figure
+out of the Answer.
 
 Then deliver, in this order:
 

@@ -6,9 +6,10 @@ It writes a four-line question analysis that covers the decision the answer serv
 type, the presuppositions and the useless answer. It derives three to five sub-questions from the
 decision and runs up to three collection agents in parallel, each spending one query on what would
 make its answer wrong. The result is one Markdown report. Every claim in it has a full URL, a
-publication date and a source grade, and every key figure has a quote from its page. The three figures
-the answer depends on are re-fetched before delivery, and the Answer states the mechanism behind
-it. Documents the user supplies are read alongside the web.
+publication date and a source grade, and every key figure has a quote from its page. Before
+delivery, the main session re-fetches the pages behind the key figures the answer depends on most,
+up to three of them. The report's Answer section also states the mechanism behind the answer.
+Documents the user supplies are read alongside the web.
 
 The re-fetch is the plugin's one check. The evidence ledger, script-matched quotes, verifier
 agents and audit gate of a full verification pipeline belong to research-team. The plugin consists
@@ -26,8 +27,10 @@ of Markdown files only.
 scan-research stops and hands the job to research-team when:
 
 - the sources conflict on the figure the answer depends on
+- the stakes turn out to be money or an external publication
 - a falsifier search or a re-fetched page contradicts the answer
-- a presupposition the request rested on turns out to be false
+- a presupposition the request rested on turns out to be false, and the sources leave the
+  correction open
 - the run passes about 60 searches
 
 The agents search the general web. They reach for academic sources only where a sub-question is
@@ -50,7 +53,7 @@ A run writes its files to `research/{YYYYMMDD}-{topic-slug}/`.
 | File | Written by | Contents |
 |---|---|---|
 | `evidence/{sub-question-slug}.md` | Each collection agent | Its source table with quotes, falsifier table, search log and gaps |
-| `report.md` | The main session | Question analysis, answer with its mechanism, findings per sub-question with their falsifier, where sources disagree, source table, what was left out |
+| `report.md` | The main session | Question analysis, answer with its mechanism, findings per sub-question with their falsifier, where sources disagree, source table, re-fetch outcomes, what was left out |
 
 ## Contents
 
