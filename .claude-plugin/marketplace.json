@@ -4,13 +4,13 @@
     "name": "tomkd555",
     "url": "https://github.com/tomkd555"
   },
-  "description": "A light research skill for Claude Code: a few sub-questions, parallel collection, and one sourced Markdown report — without a verification pipeline.",
+  "description": "A light research skill for Claude Code: a few sub-questions, parallel collection, and one sourced Markdown report.",
   "plugins": [
     {
       "name": "scan-research",
       "source": "./plugins/scan-research",
       "description": "Scans a topic in one pass: three to five sub-questions, up to three collection agents in parallel, and a single Markdown report whose every claim carries a URL, a date and a source grade.",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "author": {
         "name": "tomkd555",
         "url": "https://github.com/tomkd555"
