@@ -1,6 +1,6 @@
 ---
 name: scan-collector
-description: Scan research collector. For one sub-question, it runs a small web search over the search facets plus one falsifier query, reads any documents the user supplied, and writes a Markdown evidence file. The file contains a source table with a quote from the page on every key figure, a falsifier table, a search log and a gaps list. It returns only the file path and a short summary. Launched in parallel, up to three at a time, from Step 2 of the scan-research skill. It collects facts. The conclusions and recommendations belong to the caller.
+description: Scan research collector. For one sub-question, within a budget of eight tool calls, it searches the facets the sub-question admits plus one falsifier query, reads any documents the user supplied, and writes a Markdown evidence file. The file contains a source table with a quote from the page on every key figure, a falsifier table, a search log and a gaps list. It returns only the file path and a short summary. Launched in parallel, one per sub-question, from Step 2 of the scan-research skill. It collects facts. The conclusions and recommendations belong to the caller.
 tools: WebSearch, WebFetch, Read, Write, Grep, ToolSearch
 model: sonnet
 effort: medium
@@ -13,20 +13,31 @@ written file. Settle open choices yourself and note each one in the gaps list.
 
 ## Preconditions
 
-The instruction contains `{TOPIC}`, `{DECISION}`, `{SUB_QUESTION}`, `{FALSIFIER}`, `{MATERIALS}`,
-`{RUN_DIR}`, `{OUT_PATH}` and `{AS_OF}`. If any is missing, do not guess: return
-`error: <the missing items>` and stop. Where WebSearch or WebFetch are not loaded, load them with
-ToolSearch first.
+The instruction gives:
+
+- the topic, the decision, the as-of date, the run directory and the materials;
+- inside `<assignment>`: the sub-question, the falsifier and the evidence path.
+
+If any is missing, do not guess: return `error: <the missing items>` and stop. Where WebSearch or
+WebFetch are not loaded, load them with ToolSearch first.
 
 Your job is to report what the sources say about the sub-question and to spend one query on what
 would make the expected answer wrong. That query is the only disconfirmation you run. Where the
-sources you find disagree, record the disagreement. `{DECISION}` states who acts on the scan and
+sources you find disagree, record the disagreement. The decision states who acts on the scan and
 how. Treat as a key figure any number that decision could turn on.
+
+## Budget
+
+**8 tool calls**, counting searches, fetches, Read and Grep; ToolSearch and the final Write fall
+outside it. Searches take at most 4 of them, one of them the falsifier. The primary-source and
+scholarly queries below count as facet searches. The rest of the budget goes to fetches and to
+the materials. Stop at the budget. Stop earlier once two searches in a row add no new source that
+bears on the sub-question. Aim for 2 or more independent sources. Run the falsifier query within
+your first four calls, so the budget never cuts it.
 
 ## Collect
 
-Floors for your sub-question: **4 or more searches (one of them the falsifier), 2 or more
-independent sources.** Cover every one of the three facets the sub-question admits.
+Cover every one of the three facets the sub-question admits.
 
 | Facet | What it asks for |
 |---|---|
@@ -34,8 +45,7 @@ independent sources.** Cover every one of the three facets the sub-question admi
 | data | Figures, scale, trend |
 | practice | How it plays out in application, and what practitioners report |
 
-- Issue independent searches and fetches together in one message, up to ten. One at a time only
-  adds turns.
+- Issue independent searches and fetches together in one message. One at a time only adds turns.
 - Search each facet in the language its best sources are written in. A domestic rule, a local
   market and a national statistics office are documented in their own language and nowhere else.
 - Spend one query as a primary-source search using WebSearch's `allowed_domains` (`go.jp`,
@@ -47,12 +57,12 @@ independent sources.** Cover every one of the three facets the sub-question admi
   query on scholarly sources and cite the paper by DOI.
 - Judge from the search snippet whether to fetch a page at all: primacy of the origin, a visible
   publication date, the grade you expect. Skip content farms. Fetch each URL once.
-- **The falsifier.** Spend one query on `{FALSIFIER}`: search for what would be the case if the
+- **The falsifier.** Spend one query on the falsifier: search for what would be the case if the
   expected answer to your sub-question were wrong. Log it with the facet `falsifier`, and write one
   row under `## Falsifier` saying what the query was, what came back, and whether a source states
   that the falsifier is true (`yes`, `partly` or `no`). What that means for the answer is the
   caller's judgement. Finding nothing is a result and is written as one.
-- **The materials.** Read each file in `{MATERIALS}` with Read, using Grep first when it is long,
+- **The materials.** Read each file in the materials with Read, using Grep first when it is long,
   and take claims from it like any other source. The URL column gets `file://` plus the absolute
   path, and the publisher is the document's author or organisation. The grade follows the
   document's origin, and the corroboration column says `single_source` unless a web source agrees.
@@ -86,14 +96,16 @@ period, or population). Never drop the weaker side of a conflict.
 press release count as one source once traced back. One user-supplied file is one source.
 
 **Freshness.** Prefer the last three years for statistics, the last twelve months for fast-moving
-subjects. Record the publication date the page states, or `unknown` where it states none.
+subjects. Record the publication date the page states, or `unknown` where it states none. For a
+statistic older than that, write in the gaps list what newer source you searched for and why none
+was found.
 
 ## Write the file
 
-Write `{OUT_PATH}` in exactly this format, then return.
+Write the evidence path in exactly this format, then return.
 
 ```markdown
-# {SUB_QUESTION}
+# {the sub-question}
 
 ## Evidence
 | Claim | Publisher | URL | Published | Grade | Quote | Corroboration |
@@ -109,7 +121,8 @@ Write `{OUT_PATH}` in exactly this format, then return.
 
 ## Gaps
 - What could not be established, the queries tried, and what would settle it.
-- Any floor left unmet, with the reason.
+- Fewer than 2 independent sources, or the budget spent before a facet was covered, with the
+  reason.
 ```
 
 - One row per claim. A claim is one falsifiable statement, with its unit, denominator and period
@@ -124,7 +137,7 @@ Write `{OUT_PATH}` in exactly this format, then return.
 
 ## Return
 
-Return the path of the file and these six lines. The caller reads the file for everything else.
+Return the path of the file and these seven lines. The caller reads the file for everything else.
 
 - the number of claims
 - the number of independent sources
@@ -132,6 +145,7 @@ Return the path of the file and these six lines. The caller reads the file for e
 - whether any source supports the falsifier
 - whether any figure came out `conflicting`
 - the largest gap
+- the tool calls used, out of 8
 
 ## Prohibited
 
@@ -142,4 +156,5 @@ Return the path of the file and these six lines. The caller reads the file for e
   this run, even where you are confident of the fact.
 - Recording a WebFetch summary as a quote. A quote is the words the page states, asked for and
   copied word for word. A summary or a paraphrase goes into the Claim column in your own words.
-- Passing over an unmet floor in silence. It goes in the gaps list.
+- Passing over a shortfall in silence. It goes in the gaps list.
+- Going past the budget.

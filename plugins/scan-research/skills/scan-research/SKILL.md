@@ -3,12 +3,14 @@ name: scan-research
 description: >-
   Scans a topic in one pass and returns one sourced Markdown report. It writes a four-line
   question analysis (the decision, the question type, the presuppositions, the useless answer),
-  derives three to five sub-questions from the decision, and launches up to three collection
-  agents in parallel, each spending one query on what would make its answer wrong. In the report,
-  every claim has a full URL, a publication date and a source grade, every key figure has a
-  quote from its page re-fetched before delivery, and the Answer states the mechanism behind it.
-  Web-first, plus any documents the user supplies; academic sources come in only where a
-  sub-question turns on effectiveness or causality. Use it when the request wants coverage of a
+  derives three or four sub-questions from the decision, and launches one collection agent per
+  sub-question in parallel, each on a budget of eight tool calls with one query spent on what
+  would make its answer wrong. Before delivery, a verification agent in a fresh context checks up
+  to five Answer sentences against their sources, and the main session rewrites what it flags. In
+  the report, every claim has a full URL, a publication date and a source grade, every key figure
+  has a quote from its page, and the Answer states the mechanism behind it. Web-first, plus any
+  documents the user supplies; academic sources come in only where a sub-question turns on
+  effectiveness, causality or a comparison of methods. Use it when the request wants coverage of a
   subject with its sources attached but does not warrant a verified evidence ledger:
   「ざっと調べて」「一通り調べて」「概況をまとめて」「軽く調査して」「サッと調べて」
   「全体像を掴みたい」, "give me a scan of", "brief me on", "what's the state of".
@@ -30,25 +32,30 @@ allowed-tools:
 
 # scan-research
 
-A scan is the step between one search and a research-team run. It provides coverage, sourcing
-and one round of doubt. Its safeguards are a floor on collection, a grade on every source, a
-quote from the page on every key figure, and a re-fetch of up to three key figures, the ones the
-Answer depends on most. The evidence ledger, script-matched quotes, verifier agents and audit gate
-belong to research-team.
+A scan is the step between one search and a research-team run. Spend its tokens on searching and
+on checking the sentences the Answer rests on, and none on re-reading. The collectors search and
+read the pages. The main session reads only their evidence files, the verdicts and the agents'
+summaries, so its context stays small for every turn that re-reads it. The one exception is the
+fallback under Errors. Its safeguards are a fixed collection budget, a grade
+on every source, a quote from the page on every key figure, and one verifier that checks up to
+five Answer sentences without seeing the report. research-team adds a script that matches every
+quote against a cached copy of its page, verification of up to 10 sentences (STANDARD) or 25
+(DEEP), and a script check of the report and its translation.
 
-Run the whole thing in the main session. The only delegation is collection. Pause for the user
-only at the two points this skill names: the scope question in Step 1 and the hand-over to
-research-team. Between them, carry every step through to delivery.
+Pause for the user only at the scope question in Step 1 and the hand-over to research-team.
+Before each step, say in one line what it does; when a wait ends, say in one line what came back.
+While agents run, do the work that does not depend on them. When nothing is left, end the turn
+with one line on what is running; their notifications resume the scan.
 
 **Language.** Section headings, table headers and the confidence levels are English. The prose
 under them follows the user's standing convention for deliverables.
 
 ## Step 1 Frame
 
-Write the report's header first and keep it as written.
+Draft the report's header first and keep it as written.
 
 - Purpose: what this scan is for, in one line.
-- As-of date: today's date. Everything later is judged against it.
+- As-of date `{AS_OF}`: today's date as YYYY-MM-DD. Everything later is judged against it.
 - Question analysis, in four lines:
 
 ```markdown
@@ -63,78 +70,62 @@ Write the report's header first and keep it as written.
   sub-question; one marked `accept` gives its reason. Write `none identified` when the request
   assumes nothing.
 
-- Sub-questions: three to five, each ending in a question mark, each derived from the
-  decision as a condition that must hold for the answer to come out one way or the other. A
-  sub-question whose answer would leave what the reader does unchanged belongs in "Not covered".
-  Fewer than three means the request was a lookup; more than five means it belongs to
-  research-team.
+- Sub-questions: three or four, each ending in a question mark, each derived from the decision
+  as a condition that must hold for the answer to come out one way or the other. A sub-question
+  whose answer would leave what the reader does unchanged belongs in "Not covered". Count the
+  `verify` presuppositions among them. Fewer than three means the request was a lookup: answer it
+  with WebSearch in the conversation and write no files. More than four is a hand-over (below).
 - Falsifier per sub-question: one line each, stating what would have to be true for the
   expected answer to be wrong. Where you have no expected answer, the falsifier is the strongest
-  claim on the other side of the sub-question. It is the collector's `{FALSIFIER}`.
+  claim on the other side of the sub-question.
 - Materials: the absolute paths of the documents the user supplied, or `none`.
 
-This skill reports what the sources say and why they say it. Its one round of doubt is the
-falsifier query. Disconfirmation plans and competing hypotheses belong to research-team. Where the
-sources disagree, record the disagreement in Step 3. Where they agree, report the agreement as it
-stands.
+This skill reports what the sources say and why they say it. Its one round of doubt during
+collection is the falsifier query. Disconfirmation plans and competing hypotheses belong to
+research-team. Where the sources disagree, record the disagreement in Step 4. Where they agree,
+report the agreement as it stands.
 
 Ask the user at most one AskUserQuestion round, and only when the scope is ambiguous: which
 market, which period, which reader. Otherwise proceed on defaults and state them in the report
 header.
 
-Create the output directory `research/{YYYYMMDD}-{topic-slug}/` unless the user gives a path.
+The output directory is `research/{YYYYMMDD}-{topic-slug}/` unless the user gives a path. It is
+`{RUN_DIR}` below, as an absolute path. The first Write into it creates it.
 
 ## Step 2 Collect
 
-Launch one `scan-collector` per sub-question, at most three, in one message. Where there are four
-or five sub-questions, take the remainder yourself. Read the collector's procedure in
-`../../agents/scan-collector.md`, relative to this skill's base directory, and run it under the
-same floors. Write the same evidence file for each, so Step 3 reads every sub-question the same way.
-A second wave of collectors would add more wall-clock time than it saves. Tell the user in one line
-which sub-questions are being collected. The collectors run in the background; collect the
-remainder while they run.
+Launch one `scan-research:scan-collector` per sub-question, all in one message, each with
+`model: sonnet`.
+Tell the user in one line which sub-questions are being collected. Each launch prompt puts the
+text shared by every launch first, so the launches share a cached prefix:
 
-Pass each launch exactly these variables. The agent definition contains the procedure and sets the
-collector's model and effort, so leave both unset at launch:
+```text
+Collect evidence for one sub-question, following your agent definition.
 
-| Variable | Value |
-|---|---|
-| `{TOPIC}` | The topic as a whole, for context |
-| `{DECISION}` | The Decision line from the question analysis; the collector uses it to tell which figures are key |
-| `{SUB_QUESTION}` | This agent's one sub-question, verbatim |
-| `{FALSIFIER}` | The falsifier line for this sub-question |
-| `{MATERIALS}` | The user's documents as absolute paths, or `none` |
-| `{RUN_DIR}` | The absolute path of the output directory |
-| `{OUT_PATH}` | `{RUN_DIR}/evidence/{sub-question-slug}.md` |
-| `{AS_OF}` | The as-of date from Step 1 |
+- Topic: {the topic as a whole}
+- Decision: {the Decision line}
+- As-of date: {AS_OF}
+- Run directory: {RUN_DIR}
+- Materials: {absolute paths, or none}
 
-**Floors, per sub-question.** 4 or more searches, one of them the falsifier; 2 or more independent
-sources. Across the whole scan, all three facets below must appear. A floor is a minimum. Write
-any shortfall into the gaps list.
+<assignment>
+- Sub-question: {this agent's sub-question, verbatim}
+- Falsifier: {the falsifier line for this sub-question}
+- Evidence path: {RUN_DIR}/evidence/sq{n}.md, n being the sub-question's number
+</assignment>
+```
 
-| Facet | What it asks for | Query shape |
-|---|---|---|
-| definition | The standard understanding and vocabulary | "what is {topic}" / "{topic} overview" |
-| data | Figures, scale, trend | "{topic} statistics" / "{topic} market size" |
-| practice | How it plays out in application, and what practitioners report | "{topic} case study lessons" / "{topic} 導入 課題" |
+Each collector has a budget of eight tool calls and spends one of them on the falsifier. The
+collector's definition holds the facets, the grades and the quote rule, so a scan spends about 32
+tool calls on collection, plus up to 8 for each relaunch. Claude Code caps WebSearch at 200 calls per session, shared by the
+parent and every subagent.
 
-Run each query in whatever language its best sources are written in. Use WebSearch's
-`allowed_domains` for a primary-source search (`go.jp`, `e-stat.go.jp`, `oecd.org`, the
-regulator's or the company's own domain). The argument takes a list of domains in one call.
-
-**The academic supplement.** Where a sub-question turns on effectiveness, causality or a comparison
-of methods, spend one of its queries on scholarly sources and cite the paper by DOI. A request
-whose whole weight is academic belongs to literature-review.
-
-**Budget.** Roughly 25 to 45 WebSearch calls for the scan. A collector runs its four-search floor,
-which includes the falsifier, plus what its gaps need. It stops once two queries in a row return
-only sources it already has. The cap is Claude Code's 200 searches per session, shared by the parent
-and every subagent. Passing 60 means the request outgrew this skill. Say so and offer
-research-team.
+While the collectors run, write the report's header and question analysis into
+`{RUN_DIR}/report.md`.
 
 ## Step 3 Assemble
 
-Each collector writes its evidence file and returns only the path plus a six-line summary. Read
+Each collector writes its evidence file and returns only the path plus a seven-line summary. Read
 the files with Read and take every table from the files. A table copied out of a message body is
 where URLs get mangled.
 
@@ -146,7 +137,7 @@ corroboration count treats one number as one origin. Carry the Quote column thro
 
 ## Step 4 Write
 
-One file, `{RUN_DIR}/report.md`, written in one pass from the evidence files:
+Complete `{RUN_DIR}/report.md` in one pass from the evidence files:
 
 ```markdown
 # {topic}: scan as of {AS_OF}
@@ -166,8 +157,9 @@ say that the mechanism is not established.
 
 ## Findings
 ### {sub-question 1}
-Claims, each with its `[S#]`. Figures carry unit, denominator and period.
-Falsifier: {the query}, {what came back}, {whether it changes the answer}.
+Claims, each sentence ending with its `[S#]`. Figures carry unit, denominator and period.
+Falsifier: {the query}, {what came back}, {whether it changes the answer}. Where nothing came
+back, the line cites nothing.
 ### {sub-question 2}
 …
 
@@ -178,10 +170,9 @@ definition, period or population. Omit the section where they agree.
 ## Sources
 | # | Source | URL | Published | Grade | Quote | Corroboration |
 
-## Re-fetch
-| Figure | URL | Words returned | Outcome |
-(up to three key figures, the ones the Answer depends on most; outcome is confirmed, dropped,
-contradicted or unreadable)
+## Verification
+| # | Sentence | Verdict | Action |
+(the Answer sentences sent to the verifier in Step 5, with its verdicts and what was done)
 
 ## Not covered
 What this scan left out, what could not be confirmed, and what a research-team run would add.
@@ -191,9 +182,10 @@ of informed opinion.
 
 Write every claim in the Answer and Findings from the evidence files, including points you
 believe you already know. A point that only your own knowledge supports goes to "Not covered".
-Findings state each claim in your own words with its `[S#]`. A page's own wording appears only in
-the Quote column, or in quotation marks beside its `[S#]`, so the reader can tell the source's
-words from the summary:
+Every sentence that states a fact ends with its `[S#]`, and every sentence with a number carries
+one. Findings state each claim in your own words. A page's own wording appears only in the Quote
+column, or in quotation marks beside its `[S#]`, so the reader can tell the source's words from
+the summary:
 
 <example>
 Findings line: Public chargers in the region grew by about a quarter in 2024 [S3], and the
@@ -202,96 +194,104 @@ Why it is correct: the claim is in the writer's own words with its source number
 phrase copied from the page is in quotation marks beside it.
 </example>
 
-Sources lists only the rows the Answer or Findings cite, each with its full
-absolute URL. Size the report to its findings: the template's sections and nothing more, no
-summary that repeats the Answer, and a literal phrase wherever a metaphor would stand.
+The collector's definition, `../../agents/scan-collector.md` relative to this skill's base
+directory, holds the evidence standards. The report applies four of them:
+
+- A key figure in the Answer needs a grade A or B source. Grade C sources corroborate.
+- A figure marked `single_source` says so in the body. A figure marked `conflicting` goes to
+  "Where sources disagree" with both values; a conflict is never hidden.
+- A user-supplied document counts as an interested source unless its publisher is independent of
+  the decision.
+- A statistic older than three years, or older than twelve months on a fast-moving subject, comes
+  with a note on why nothing newer exists.
+
+Sources lists only the rows the Answer or Findings cite, each with its full absolute URL. Size the
+report to its findings: the template's sections and nothing more, no summary that repeats the
+Answer, and a literal phrase wherever a metaphor would stand.
 
 **Confidence** is one of three, chosen for the answer as a whole:
 
 | Level | When |
 |---|---|
-| high | Two or more independent grade-A/B sources agree, they are current, and no falsifier search moved the answer |
+| high | Two or more independent grade-A/B sources agree, they are current, no falsifier search moved the answer, and every Answer sentence sent to the verifier came back `supported` |
 | medium | Sources agree but are thin, dated, or partly grade C |
 | low | One source only, the sources conflict and none of them shows which is right, or a falsifier search found evidence against the answer |
 
-## Evidence standards
+## Step 5 Verify
 
-**Grades.**
+Take the sentences in the Answer section that state a fact, up to five, those with a figure
+first. The assumption sentence of the mechanism paragraph stays out. Write them to
+`{RUN_DIR}/claims.md`, each with the source rows that state its claim, at most two:
 
-- A: governments, international organisations, peer-reviewed papers.
-- B: industry bodies, corporate IR, major research firms, published firm reports, and a vendor's
-  own product, pricing and support pages. Preprints are B, marked `preprint`.
-- C: trade media, news reporting, blogs, forums.
+```markdown
+## C1
+Sentence: {the sentence as written, without its [S#]}
+- {full URL or file:// path} | {grade} | {the row's quote, or no quote}
+```
 
-A vendor's page is the authority on its own price and a party to every other claim. A key figure
-needs a grade A or B source. Grade C sources corroborate. A document the user supplied is graded
-by its origin: a ministry report is A, an internal memo B. It counts as an interested source
-unless its publisher is independent of the decision.
+Launch one `scan-research:scan-verifier` with `model: opus` and pass the two paths only. The report, the
+question analysis and your reasoning stay out of the prompt, because a verifier shown the intent
+reads the intent into the source.
 
-**Quotes.** Treat as a key figure any number the Answer or the decision could turn on. Give every
-key figure the words from the page that state it, 125 characters at most, copied as the page has
-them. WebFetch copies text word for word only up to that length. `no quote` forces
-`single_source`.
+```text
+Judge the claims in the file below, following your agent definition.
 
-**Corroboration**, on every key figure: `corroborated` (two or more independent sources at a
-comparable value), `single_source` (usable, but say so in the body), `conflicting` (record both
-values and the reason). Never hide a conflict.
+- Claims: {RUN_DIR}/claims.md
+- Write verdicts to: {RUN_DIR}/verdicts.md
+```
 
-**Independence** is counted by origin: pages from one publisher are one source, and reprints or a
-shared press release are one source once traced back. One user-supplied file is one source.
+When its verdicts arrive, read `verdicts.md` and act on each sentence:
 
-**Freshness.** Statistics and market data from the last three years; for fast-moving subjects
-(AI, regulation, pricing) the last twelve months. Anything older needs a note on why nothing newer
-exists. Give every source row the publication date the page states, or `unknown` where it states
-none.
+| Verdict | Action |
+|---|---|
+| `supported` | Keep the sentence |
+| `partial` | Rewrite it to what the passage in the verdict supports |
+| `unsupported` | Remove it from the Answer; the point goes to "Not covered" |
+| `unreadable` | Keep it, and say in the sentence that the re-read could not confirm it |
+| `contradicted` | Hand over to research-team (below) |
 
-**Primary sources.** Where a secondary source cites primary data, cite the primary source.
-Do not fetch a page the search snippet already shows to be a content farm.
-
-## Step 5 Re-fetch
-
-The quotes came from the collectors' reads. This step tests the quotes of the three key figures
-the Answer depends on most against the page itself. Where the Answer rests on fewer than three
-key figures, re-fetch each one it has; where it rests on none, write `none` in the Re-fetch table.
-Fetch the pages again with WebFetch in one message, asking each to return only the words around
-the figure, 125 characters at most. WebFetch serves its own copy
-of a URL fetched within the last fifteen minutes, so append a harmless query string (`?recheck=1`)
-to get a fresh read. For a figure from a user-supplied file, Grep the quoted words in the file.
-
-- `confirmed`: the words returned contain the figure.
-- `dropped`: the words lack the figure, or the page is unreachable. The figure leaves the Answer
-  and goes to "Not covered".
-- `contradicted`: the words state a different value. This is a hand-over (below).
-- `unreadable`: the page loads, but WebFetch returns garbled text, as it does for some Shift_JIS
-  pages. The figure stays, and the body says the re-fetch could not confirm it.
-
-Edit the report in place: fill the Re-fetch table with the outcomes and move any dropped figure
-out of the Answer.
+Edit only the flagged sentences, one Edit per sentence plus one Edit to "Not covered" for each
+`unsupported` one. Apply the same change to the Findings sentence that states the same claim, and
+leave every other sentence as it is. Fill the Verification table and choose the confidence level
+again from the edited Answer.
 
 Then deliver, in this order:
 
 - the answer with its mechanism paragraph
 - the key findings with their `[S#]`
 - any disagreement between sources
-- the re-fetch outcomes, in one line
+- the verification outcomes, in one line
 - the confidence level
 - the path of `report.md`
 
 Every number in the final message comes from the report.
 
+## Errors
+
+| Situation | Action |
+|---|---|
+| The Agent tool is unavailable | Run the collector's procedure for each sub-question in this session. In Step 5, re-read each claim's page yourself as `../../agents/scan-verifier.md` describes, and state in "Not covered" that the author ran the check |
+| A collector returns an error or no file | Relaunch it once. After a second failure, record the sub-question in "Not covered" |
+| WebSearch returns a budget-exceeded string | Record the shortfall in "Not covered" |
+| The verifier returns an error or no `verdicts.md` | Relaunch it once. After a second failure, mark every sentence `unverified` and state it in "Not covered" |
+| The verifier leaves a claim without a verdict | Mark the sentence `unverified` in the Verification table |
+
 ## Hand-over to research-team
 
 Stop and offer research-team when any of these happens:
 
+- Step 1 yields more than four sub-questions.
 - Sources conflict on the figure the answer turns on.
 - The stakes turn out to be money or an external publication.
-- The budget passes 60 searches.
+- A sub-question the Answer turns on ends with fewer than two independent sources.
 - A falsifier search returns evidence against the direction of the answer.
 - A presupposition marked `verify` turns out to be false, and the sources in hand leave the
   correction open. A presupposition the sources correct in one line is a finding, written into
   the Answer.
-- A re-fetched page contradicts a figure the Answer depends on.
+- The verifier marks an Answer sentence `contradicted`.
 
-Each of these is a question the scan's checks cannot resolve. Say what the scan established and
-what it could not, then hand over. A scan extended toward a pipeline loses its speed and still
+Each of these is a question the scan's checks cannot resolve. Before offering, finish
+`report.md` up to the step reached: remove any `contradicted` sentence from the Answer, fill the
+Verification table if Step 5 ran, and name the trigger in "Not covered". Say what the scan
+established and what it could not, then hand over. A scan extended toward a pipeline loses its speed and still
 lacks the pipeline's checks.

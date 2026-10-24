@@ -1,19 +1,10 @@
 # scan-research
 
-A Claude Code plugin for light web research.
-
-It writes a four-line question analysis that covers the decision the answer serves, the question
-type, the presuppositions and the useless answer. It derives three to five sub-questions from the
-decision and runs up to three collection agents in parallel, each spending one query on what would
-make its answer wrong. The result is one Markdown report. Every claim in it has a full URL, a
-publication date and a source grade, and every key figure has a quote from its page. Before
-delivery, the main session re-fetches the pages behind the key figures the answer depends on most,
-up to three of them. The report's Answer section also states the mechanism behind the answer.
-Documents the user supplies are read alongside the web.
-
-The re-fetch is the plugin's one check. The evidence ledger, script-matched quotes, verifier
-agents and audit gate of a full verification pipeline belong to research-team. The plugin consists
-of Markdown files only.
+A Claude Code plugin for light web research. It derives three or four sub-questions from the
+decision the answer serves and collects each one in parallel on a fixed budget. It writes one
+sourced Markdown report, and before delivery a verifier in a fresh context checks the Answer's
+sentences against their sources. Every claim has a full URL, a publication date and a source
+grade, and every key figure has a quote from its page. The plugin consists of Markdown files only.
 
 ## When to use it
 
@@ -24,17 +15,13 @@ of Markdown files only.
 | High stakes: a budget, an external publication, a management decision, or a subject the sources disagree about | [research-team](https://github.com/tomkd555/research-skill) |
 | A literature review with no web component | literature-review, which ships with research-team |
 
-scan-research stops and hands the job to research-team when:
+A scan stops and offers research-team when:
 
+- the request needs more than four sub-questions
 - the sources conflict on the figure the answer depends on
+- a sub-question the answer turns on has fewer than two independent sources
+- a falsifier search or the verifier finds evidence against the answer
 - the stakes turn out to be money or an external publication
-- a falsifier search or a re-fetched page contradicts the answer
-- a presupposition the request rested on turns out to be false, and the sources leave the
-  correction open
-- the run passes about 60 searches
-
-The agents search the general web. They reach for academic sources only where a sub-question is
-about effectiveness, causality or a comparison of methods, and they cite those by DOI.
 
 ## Install
 
@@ -44,23 +31,18 @@ about effectiveness, causality or a comparison of methods, and they cite those b
 ```
 
 Then ask for a scan in either language: 「ざっと調べて」「一通り調べて」「概況をまとめて」,
-"give me a scan of", "brief me on".
+"give me a scan of", "brief me on". A run writes into `research/{YYYYMMDD}-{topic-slug}/`:
 
-## Output
-
-A run writes its files to `research/{YYYYMMDD}-{topic-slug}/`.
-
-| File | Written by | Contents |
-|---|---|---|
-| `evidence/{sub-question-slug}.md` | Each collection agent | Its source table with quotes, falsifier table, search log and gaps |
-| `report.md` | The main session | Question analysis, answer with its mechanism, findings per sub-question with their falsifier, where sources disagree, source table, re-fetch outcomes, what was left out |
-
-## Contents
-
-| Path | What it holds |
+| File | Content |
 |---|---|
-| `plugins/scan-research/skills/scan-research/SKILL.md` | The procedure, the collection floors, the evidence standards |
-| `plugins/scan-research/agents/scan-collector.md` | The collection agent, one per sub-question, running on Sonnet at medium effort; one falsifier query and a quote on every key figure |
+| `report.md` | question analysis, the answer with its mechanism, findings per sub-question, sources, verification outcomes, what was left out |
+| `evidence/sq{n}.md` | each collector's source table with quotes, falsifier, search log and gaps |
+| `claims.md`, `verdicts.md` | the Answer sentences sent to the verifier, and its verdicts |
+
+| Agent | Model | Role |
+|---|---|---|
+| scan-collector | Sonnet, medium effort | one sub-question, 8 tool calls, one falsifier query |
+| scan-verifier | Opus | up to 5 Answer sentences against their sources, without the report |
 
 ## License
 
